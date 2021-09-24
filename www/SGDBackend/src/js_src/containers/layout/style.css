@@ -1,0 +1,84 @@
+.navWrapper {
+  background: #0581C2;
+  padding: 0;
+}
+.logoText {
+  font-weight: bold;
+  margin-left: 0.25rem;
+}
+.imgLogo {
+  width: 13rem;
+}
+.messageText {
+  margin-bottom: 0.25rem;
+}
+.menu {
+  background: #0581C2;
+  font-size: 18px;
+}
+.authMenu {
+  font-size: 18px;
+  margin-top: 0.5rem;
+  margin-right: 0.75rem;
+  background: #0581C2;
+}
+.authMenu li {
+  background: #0581C2;
+}
+.vWrapper {
+  background: purple;
+}
+.navLink {
+  color: white !important;
+  background: #0581C2;
+}
+.navLink:hover {
+  color: white;
+}
+.indexLink {
+  color: black !important;
+  font-weight: bold;
+  display: block;
+  padding: 0.5rem 0;
+}
+.indexLink:hover {
+  color: white;
+}
+.indexText {
+  font-size: 28px;
+}
+.contentRow {
+  width: 100%;
+  max-width: none;
+}
+.contentContainer {
+  margin-top: 1rem;
+}
+.errorContainer {
+  position: fixed;
+  top: 4rem;
+  right: 0.75rem;
+  z-index: 5;
+  width: 30rem;
+}
+.closeIcon {
+  float: right;
+  cursor: pointer;
+  position: relative;
+  top: -0.5rem;
+}
+
+.topMenu {
+  background: none !important;
+}
+
+.topMenu a {
+  color: white;
+}
+
+.demoWarning {
+  position: fixed;
+  padding: 0.5rem;
+  border-top: none;
+  border-left: none;
+}

@@ -1,0 +1,88 @@
+upstream frontend {
+    server 127.0.0.1:6545;
+    keepalive 32;
+}
+
+upstream backend {
+    server 127.0.0.1:6543 max_fails=5 fail_timeout=30s;
+    keepalive 32;
+}
+
+log_format client_ip '$http_x_forwarded_for - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "request-time=$request_time" "upstream_response_time=$upstream_response_time" $pipe';
+
+server {
+    listen 8080;
+
+    server_name _;
+
+    include /etc/nginx/conf.d/proxies;
+    include /etc/nginx/conf.d/redirects;
+
+    port_in_redirect off;
+
+    location /favicon.ico {
+        alias /data/www/SGDFrontend/current/src/sgd/frontend/yeastgenome/img-domain/favicon.ico;
+    }
+    
+    location /healthcheck {
+        proxy_redirect off;
+        proxy_next_upstream error;
+        proxy_pass http://backend/healthcheck;
+        break;
+    }
+    
+    location /robots.txt {
+        alias /var/www/html/robots.txt;
+    }
+
+    location / {
+        access_log /var/log/nginx/sgd-frontend-access.log client_ip;
+        error_log /var/log/nginx/sgd-frontend-error.log;
+
+#        add_header Strict-Transport-Security "max-age=120; includeSubDomains" always;
+
+        proxy_http_version		1.1;
+        proxy_set_header		Connection "";
+        proxy_set_header		Host $host:$server_port;
+        proxy_set_header		X-Real-IP $remote_addr;
+        proxy_set_header		X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        client_max_body_size		0;
+        client_body_buffer_size		128k;
+        proxy_connect_timeout		300s;
+        proxy_send_timeout		300s;
+        proxy_read_timeout		300s;
+        proxy_buffering			off;
+        proxy_temp_file_write_size	64k;
+        proxy_pass			http://frontend/;
+        proxy_redirect			off;
+
+        # remove trailing slashes
+        rewrite ^/(.*)/$ /$1 permanent;
+
+        gzip          on;
+        gzip_types    text/plain application/javascript application/x-javascript text/javascript text/xml text/css application/json;
+    }
+
+    location /webservice/ {
+        access_log /var/log/nginx/sgd-backend-access.log client_ip;
+        error_log /var/log/nginx/sgd-backend-error.log;
+
+#        add_header Strict-Transport-Security "max-age=120; includeSubDomains" always;
+        proxy_pass				http://backend/;
+	proxy_http_version			1.1;
+	proxy_set_header			Connection "";
+        proxy_set_header X-Real-IP		$remote_addr;
+        proxy_set_header X-Forwarded-For	$proxy_add_x_forwarded_for;
+
+        proxy_connect_timeout   		300s;
+        proxy_send_timeout      		300s;
+        proxy_read_timeout      		300s;
+
+        # remove trailing slashes
+        rewrite ^/(.*)/$ /$1 permanent;
+
+        gzip          on;
+        gzip_types    text/plain application/javascript application/x-javascript text/javascript text/xml text/css application/json;
+    }
+}

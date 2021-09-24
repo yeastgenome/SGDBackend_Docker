@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="google-signin-client_id" content="{{ google_client_id }}">
+        <meta http-equiv="Cache-control" content="no-cache">
+        <meta http-equiv="Expires" content="-1">
+        <title>SGD Curator</title>
+        <!-- foundation 6 core CSS -->
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/foundation/6.1.2/foundation.css" rel="stylesheet">
+        <!-- Custom Fonts -->
+        <link href="https://fonts.googleapis.com/css?family=Lato:400,700|Droid+Serif:400,700" rel="stylesheet" type="text/css">
+        <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+        <link href="/assets/curate.css" rel="stylesheet" type="text/css">
+        <!-- local foundation changes -->
+        <style type='text/css'>
+            .row, hr {
+                max-width: none;
+            }
+            .label {
+                margin-right: 0.25rem;
+            }
+        </style>
+    </head>
+    <body>
+        {# expose token to client JS so it can be used in XHR requests #}
+        <script type="text/javascript">
+            window.CSRF_TOKEN = '{{ request.session.get_csrf_token() }}';
+            window.PUSHER_KEY = '{{ pusher_key }}';
+        </script>
+        <div id="j-application"></div>
+        <script src="https://js.pusher.com/4.0/pusher.min.js"></script>
+        <script src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
+        <!-- custom app js bundled -->
+        {% webpack 'main' %}
+            <script type="text/javascript" src="{{ ASSET.url }}"></script>
+        {% endwebpack %}
+    </body>
+</html>
