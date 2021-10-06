@@ -19,11 +19,11 @@ from email.mime.multipart import MIMEMultipart
 import re
 from sqlalchemy import and_, inspect
 
-from .models import DBSession, Dbentity, Dbuser, Go, Referencedbentity,\
+from src.models import DBSession, Dbentity, Dbuser, Go, Referencedbentity,\
     Keyword, Locusdbentity, FilePath, Edam, Filedbentity, FileKeyword,\
     ReferenceFile, Disease, CuratorActivity, Source, LocusAlias
 from src.curation_helpers import ban_from_cache, get_curator_session
-from src.aws_helpers import update_s3_readmefile, get_s3_url, get_checksum
+# from src.aws_helpers import update_s3_readmefile, get_s3_url, get_checksum
 
 
 import logging
@@ -760,10 +760,10 @@ def update_readme_files_with_urls(readme_name, update_all=False):
         logging.error("Exception occurred", exc_info=True)
         transaction.abort()
 
+'''
 
 def update_urls_helper(readme_file):
-    """ Update files with s3_urls helper"""
-
+  
     temp = []
     file_list = DBSession.query(Filedbentity).filter(
         Filedbentity.readme_file_id == readme_file.dbentity_id).all()
@@ -786,6 +786,7 @@ def update_urls_helper(readme_file):
             readme_dbentity_file.s3_url = re.sub(
                 r'\?.+', '', updated_readme['s3_url']).strip()
 
+'''
 
 def get_sources(session=None):
     ''' Get sources from dbentity model '''

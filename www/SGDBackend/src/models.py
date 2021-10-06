@@ -18,8 +18,8 @@ import transaction
 import logging
 from datetime import datetime, timedelta
 from itertools import groupby
-import boto
-from boto.s3.key import Key
+# import boto
+# from boto.s3.key import Key
 import hashlib
 import urllib.request, urllib.parse, urllib.error
 from urllib.request import Request, urlopen
@@ -27,9 +27,8 @@ from urllib.error import URLError, HTTPError
 
 from src.curation_helpers import ban_from_cache, get_author_etc, link_gene_names, get_curator_session, clear_list_empty_values
 from scripts.loading.util import link_gene_complex_names
-
-from src.aws_helpers import simple_s3_upload, get_checksum, calculate_checksum_s3_file
-
+# from src.aws_helpers import simple_s3_upload, get_checksum, calculate_checksum_s3_file
+from src.boto3_upload import upload_one_file_to_s3 
 # DBSession = scoped_session(sessionmaker(extension=ZopeTransactionExtension()))
 DBSession = scoped_session(sessionmaker(autoflush=False))
 register(DBSession)
@@ -43,8 +42,8 @@ DIRECT_SUBMISSION_SOURCE_ID = 759
 SEPARATOR = ' '
 TAXON_ID = 274901
 
-S3_BUCKET = os.environ['S3_BUCKET']
-S3_ACCESS_KEY = os.environ['S3_ACCESS_KEY']
+# S3_BUCKET = os.environ['S3_BUCKET']
+# S3_ACCESS_KEY = os.environ['S3_ACCESS_KEY']
 S3_SECRET_KEY = os.environ['S3_SECRET_KEY']
 
 # get list of URLs to visit from comma-separated ENV variable cache_urls 'url1, url2'
@@ -3037,14 +3036,16 @@ class Filedbentity(Dbentity):
         return obj
 
     def upload_file_to_s3(self, file, filename, is_web_file=False, file_path=None, flag=True):
-        """ uploads files to s3 
-        
-        Notes
-        ------
-        S3 only supports 5Gb files for uploading directly
 
-        To upload bigger files, use multi-part upload
-        """
+        try:
+            s3_path = self.sgdid + '/' + filename
+            s3_url = upload_one_file_to_s3(file, s3_path)
+            self.s3_url = s3_url
+        except Exception as e:
+            logging.error(e, exc_info=True)
+        return
+
+        # we can get rid of the following code when everything is working good 
 
         try:
             # get s3_url and upload
@@ -5111,14 +5112,42 @@ class Locusdbentity(Dbentity):
             "htp_cellular_component_terms": [],
             "computational_annotation_count": 0,
             "go_slim": [],
+            "go_slim_grouped": [],
             "date_last_reviewed": None
         }
 
         go_slims = DBSession.query(Goslimannotation).filter_by(dbentity_id=self.dbentity_id).all()
+        process_go_slim_list = []
+        function_go_slim_list = []
+        component_go_slim_list = []
+        complex_go_slim_list = []
+        go_slim_list = []
         for go_slim in go_slims:
             go_slim_dict = go_slim.to_dict()
-            if go_slim_dict:
-                obj["go_slim"].append(go_slim_dict)
+            if go_slim_dict not in go_slim_list:
+                go_slim_list.append(go_slim_dict)
+            if 'complex' in go_slim_dict['slim_name'].lower():
+                if go_slim_dict not in complex_go_slim_list:
+                    complex_go_slim_list.append(go_slim_dict)
+            else:
+                go = DBSession.query(Go).filter_by(go_id=go_slim_dict['go_id']).one_or_none()
+                if go is None:
+                    continue
+                if 'component' in go.go_namespace:
+                    if go_slim_dict not in component_go_slim_list:
+                        component_go_slim_list.append(go_slim_dict)
+                elif 'function' in go.go_namespace:
+                    if go_slim_dict not in function_go_slim_list:
+                        function_go_slim_list.append(go_slim_dict)
+                elif go_slim_dict not in process_go_slim_list:
+                    process_go_slim_list.append(go_slim_dict)
+        ## sort goslim terms here
+        obj['go_slim'] = sorted(go_slim_list, key=lambda p: p['display_name'])
+        process_go_slim_sorted_list = sorted(process_go_slim_list, key=lambda p: p['display_name'])
+        function_go_slim_sorted_list = sorted(function_go_slim_list, key=lambda p: p['display_name'])
+        component_go_slim_sorted_list = sorted(component_go_slim_list, key=lambda p: p['display_name'])
+        complex_go_slim_sorted_list = sorted(complex_go_slim_list, key=lambda p: p['display_name'])
+        obj['go_slim_grouped'] = function_go_slim_sorted_list + process_go_slim_sorted_list + component_go_slim_sorted_list + complex_go_slim_sorted_list
 
         go = {
             "cellular component": {},
@@ -7912,13 +7941,15 @@ class Goslim(Base):
     source = relationship('Source')
 
     def to_dict(self):
-        if self.slim_name == "Yeast GO-Slim":
-            return {
-                "link": self.obj_url,
-                "display_name": self.display_name.replace("_", " ")
-            }
-        else:
-            return None
+        # if self.slim_name == "Yeast GO-Slim":
+        return {
+            "slim_name": self.slim_name,
+            "go_id": self.go_id,
+            "link": self.obj_url,
+            "display_name": self.display_name.replace("_", " ")
+        }
+        # else:
+        #    return None
 
     def to_snapshot_dict(self):
         direct_annotation_gene_count = DBSession.query(Goannotation).filter_by(go_id=self.go_id).count()
