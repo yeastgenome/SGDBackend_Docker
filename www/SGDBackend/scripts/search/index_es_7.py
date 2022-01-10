@@ -1,4 +1,4 @@
-from src.models import DBSession, Base, Colleague, ColleagueLocus, Dbentity, Locusdbentity, Filedbentity, FileKeyword, LocusAlias, Dnasequenceannotation, So, Locussummary, Phenotypeannotation, PhenotypeannotationCond, Phenotype, Goannotation, Go, Goslimannotation, Goslim, Apo, Straindbentity, Strainsummary, Reservedname, GoAlias, Goannotation, Referencedbentity, Referencedocument, Referenceauthor, ReferenceAlias, Chebi, Disease, Diseaseannotation, DiseaseAlias, Complexdbentity, ComplexAlias, ComplexReference, Complexbindingannotation, ComplexGo, Tools, Alleledbentity, AlleleAlias, AllelealiasReference, AlleleReference, LocusAllele, Literatureannotation
+from src.models import DBSession, Base, Colleague, ColleagueLocus, Dbentity, Locusdbentity, Filedbentity, FileKeyword, LocusAlias, Dnasequenceannotation, So, Locussummary, Phenotypeannotation, PhenotypeannotationCond, Phenotype, Goannotation, Go, Goslimannotation, Goslim, Apo, Straindbentity, Strainsummary, Reservedname, GoAlias, Goannotation, Referencedbentity, Referencedocument, Referenceauthor, ReferenceAlias, Chebi, Disease, Diseaseannotation, DiseaseAlias, Complexdbentity, ComplexAlias, ComplexReference, Complexbindingannotation, Tools, Alleledbentity, AlleleAlias, AllelealiasReference, AlleleReference, LocusAllele, Literatureannotation
 from sqlalchemy import create_engine, and_
 from elasticsearch import Elasticsearch
 # from mapping import mapping
@@ -840,6 +840,9 @@ def index_complex_names():
 
     for c in complexes:
 
+        if c.dbentity_status == 'Deleted':
+            continue
+        
         synonyms = DBSession.query(ComplexAlias.display_name).filter_by(
             complex_id=c.dbentity_id).all()
 
@@ -849,12 +852,12 @@ def index_complex_names():
         for ref in refs:
             references.add(ref.reference.display_name)
             
-        all_go = DBSession.query(ComplexGo).filter_by(
-                        complex_id=c.dbentity_id).all()
+        all_goannots = DBSession.query(Goannotation).filter_by(
+                        dbentity_id=c.dbentity_id).all()
         process = set([])
         component = set([])
         function = set([])
-        for x in all_go:
+        for x in all_goannots:
             if x.go.go_namespace == 'biological process':
                 process.add(x.go.display_name)
             elif x.go.go_namespace == 'cellular component':
@@ -932,27 +935,19 @@ def index_alleles():
         allele_types.add(so_id_to_term.get(a.so_id))
         
         references = set([])
-        refs = DBSession.query(AlleleReference).filter_by(allele_id=a.dbentity_id).all()
-        for ref in refs:
-            references.add(ref.reference.display_name)
-        alleleAliases = DBSession.query(AlleleAlias).filter_by(allele_id=a.dbentity_id).all()
-        for x in alleleAliases:
-            allelealiasRefs = DBSession.query(AllelealiasReference).filter_by(allele_alias_id=x.allele_alias_id).all()
-            for y in allelealiasRefs:
-                if y.reference.display_name not in references:
-                    references.add(y.reference.display_name)
+        for x in DBSession.query(Literatureannotation).filter_by(dbentity_id=a.dbentity_id).all():
+            if x.reference.display_name not in references:
+                references.add(x.reference.display_name)
             
         phenotypes = set([])
         allele_loci = set([])
-        annots = DBSession.query(Phenotypeannotation).filter_by(allele_id=a.dbentity_id).all()
-        for x in annots:
+        for x in DBSession.query(Phenotypeannotation).filter_by(allele_id=a.dbentity_id).all():
             if x.phenotype.display_name not in phenotypes:
                 phenotypes.add(x.phenotype.display_name)
             if x.dbentity.display_name not in allele_loci:
                 allele_loci.add(x.dbentity.display_name)
 
-        locusAlleles = DBSession.query(LocusAllele).filter_by(allele_id=a.dbentity_id).all()
-        for x in locusAlleles:
+        for x in DBSession.query(LocusAllele).filter_by(allele_id=a.dbentity_id).all():
             if x.locus.display_name not in allele_loci:
                 allele_loci.add(x.locus.display_name)
                 
@@ -960,7 +955,7 @@ def index_alleles():
             "name": a.display_name,
             "allele_name": a.display_name,
             "href": "/allele/" + a.format_name,
-            "description": a.description,
+            "allele_description": a.description,
             "category": "Allele",
             "synonyms": [s[0] for s in synonyms],
             "allele_types": list(allele_types),
