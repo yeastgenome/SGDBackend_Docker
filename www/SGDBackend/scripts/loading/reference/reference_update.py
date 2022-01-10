@@ -20,10 +20,11 @@ log = logging.getLogger()
 log.setLevel(logging.INFO)
 CREATED_BY = os.environ['DEFAULT_USER']
 
-
-MAX = 500
+MAX = 5000
+MAX2 = 50
 MAX_4_CONNECTION = 5000
-SLEEP_TIME = 2
+SLEEP_TIME = 5
+TOP = 105000
 PUBLISHED_STATUS = 'Published'
 EPUB_STATUS = 'Epub ahead of print'
 EPUB = 'aheadofprint'
@@ -59,11 +60,12 @@ def update_reference_data(log_file):
     pmids_all = []
     pmid_to_reference = {}
     for x in nex_session.query(Referencedbentity).all():
-        if x.pmid:
-            pmids_all.append(x.pmid)
-            pmid_to_reference[x.pmid] = { 'dbentity_id': x.dbentity_id, 
-                                          'publication_status': x.publication_status,
-                                          'date_revised': x.date_revised }
+        if x.pmid is None:
+            continue
+        pmids_all.append(x.pmid)
+        pmid_to_reference[x.pmid] = { 'dbentity_id': x.dbentity_id, 
+                                      'publication_status': x.publication_status,
+                                      'date_revised': x.date_revised }
             
     reference_id_to_authors = {}
     for x in nex_session.query(Referenceauthor).order_by(Referenceauthor.reference_id, Referenceauthor.author_order).all():
@@ -97,41 +99,34 @@ def update_reference_data(log_file):
     fw.write(str(datetime.now()) + "\n")
     fw.write("Getting Pubmed records...\n")
 
-    # log.info(datetime.now())
     log.info("Getting Pubmed records and updating the database...")
 
     update_log = {}
     for field_name in field_names:
         update_log[field_name] = 0
 
-    pmids = []
-    j = 0
     i = 0
+    j = 0
     updated_pmids = []
     dbentity_ids_with_author_changed = []
+    pmids = []
+    bad_pmids = []
+    max = MAX
+    pmids_all.sort()
     for pmid in pmids_all:
-        
-        if pmid is None or pmid in [26842620, 27823544, 11483584, 30930955]:
+
+        if pmid in [33853398, 33995399, 34320248, 34328721, 34490835]:
             continue
-
-        i = i + 1
-        j = j + 1
         
-        if j >= MAX_4_CONNECTION:
-            ###########################
-            nex_session.close()
-            nex_session = get_session()
-            ###########################
-            log.info("Reference updated: " + str(i))
-            j = 0
-
-        # print "PMID: ", pmid
+        if i > TOP and max != MAX2:
+            max = MAX2
+            time.sleep(SLEEP_TIME*20)
             
-        if len(pmids) >= MAX:
+        if len(pmids) >= max:
             try:
                 records = get_pubmed_record_from_xml(','.join(pmids))
-            except:
-                log.info("Error retrieving the pubmed records for ", ','.join(pmids))
+            except Exception as e:
+                bad_pmids = bad_pmids + pmids
                 pmids = []
                 continue
             try:
@@ -149,18 +144,32 @@ def update_reference_data(log_file):
                                       update_log,
                                       updated_pmids,
                                       dbentity_ids_with_author_changed)
+                
+                log.info("Reference updated: " + str(i))
             except:
-                log.info("Error in updating data for ",	','.join(pmids))
+                log.info("Error in updating data for " + ','.join(pmids))
             pmids = []
             time.sleep(SLEEP_TIME)
+
         pmids.append(str(pmid))
 
+        i = i + 1
+        j = j + 1
+                
+        if j >= MAX_4_CONNECTION:
+            ###########################
+            nex_session.commit()
+            nex_session.close()
+            nex_session = get_session()
+            ###########################
+            j = 0
+            
     if len(pmids) > 0:
         records = None
         try:
             records = get_pubmed_record_from_xml(','.join(pmids))
-        except:
-            log.info("Error retrieving the pubmed records for ", ','.join(pmids))
+        except Exception as e:
+            bad_pmids = bad_pmids + pmids
             pmids = []
         if len(pmids) > 0:
             try:
@@ -179,8 +188,41 @@ def update_reference_data(log_file):
                                       updated_pmids,
                                       dbentity_ids_with_author_changed)
             except:
-                log.info("Error in updating data for ", ','.join(pmids))
-                
+                log.info("Error in updating data for " + ','.join(pmids))
+
+    log.info("\tGetting 'problematic' " + str(len(bad_pmids)) + " records...")
+    i = 0
+    j = 0
+    for pmid in bad_pmids:
+        i = i + 1
+        j = j + 1
+        record = None
+        try:
+            record = get_pubmed_record_from_xml(pmid)
+        except Exception as e:
+            log.info("Error retrieving the pubmed record for " + pmid)
+            continue
+        try:
+            abstracts = get_abstracts(pmid)
+            update_database_batch(nex_session, fw, record,
+                                  pmid_to_reference,
+                                  journal_id_to_abbrev,
+                                  reference_id_to_authors,
+                                  abstracts,
+                                  reference_id_to_abstract,
+                                  reference_id_to_urls,
+                                  reference_id_to_pubtypes,
+                                  key_to_type,
+                                  source_to_id,
+                                  update_log,
+                                  updated_pmids,
+                                  dbentity_ids_with_author_changed)
+            if j > 10:
+                log.info("\tReference updated: " + str(i))
+                j = 0
+        except:
+            log.info("Error in updating data for " + pmid)
+
     nex_session.commit()
 
     log.info("Reference updated: " + str(i))
@@ -189,7 +231,8 @@ def update_reference_data(log_file):
     for field_name in field_names:
         log.info("Paper(s) with " + field_name + " updated:" + str(update_log[field_name]))
 
-    log.info("PMIDs that have some of their info updated: " + ", ".join(str(v) for v in updated_pmids)) 
+    # log.info("PMIDs that have some of their info updated: " + ", ".join(str(v) for v in updated_pmids))
+    log.info("Total number of PMID papers with info updated: " + str(len(updated_pmids)))
 
     log.info(str(datetime.now()))
     log.info("Done!")
@@ -642,7 +685,7 @@ def update_reference(nex_session, fw, pmid, record, journal_id_to_abbrev, source
         x.page = page
         update_log['page'] = update_log['page'] + 1
         has_update = 1
-    if doi and doi != x.doi:
+    if (doi and doi != x.doi) or (doi is None and x.doi is not None):
         x.doi = doi
         update_log['doi'] = update_log['doi'] + 1
         has_update = 1

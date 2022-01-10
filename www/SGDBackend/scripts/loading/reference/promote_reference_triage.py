@@ -22,7 +22,10 @@ _all_genes = None
 def add_paper(pmid, created_by="OTTO"):
 
     record = get_pubmed_record(str(pmid))
-
+    if record is None:
+        print ("Can't retrieve PubMed record for PMID:" + str(pmid) + ".")
+        return (None, None)
+    
     ncbi = DBSession.query(Source).filter_by(format_name='NCBI').one_or_none()
     source_id = ncbi.source_id
 
@@ -189,6 +192,11 @@ def insert_referencedbentity(pmid, source_id, record, created_by):
     pmcid = record.get('pmc')
     pmc_url = pmc_root + pmcid + '/' if pmcid else ''
 
+    if int(pmid) == 33895134:
+        year = 2021
+    else:
+        year = int(year)
+        
     publication_status = status
     fulltext_status = pdf_status
     if pubstatus == 'aheadofprint':
@@ -203,7 +211,7 @@ def insert_referencedbentity(pmid, source_id, record, created_by):
                           publication_status = publication_status,
                           fulltext_status = fulltext_status,
                           citation = citation,
-                          year = int(year),
+                          year = year,
                           pmid = int(pmid),
                           pmcid = pmcid,
                           date_published = pubdate,
@@ -439,6 +447,10 @@ def get_pubmed_record(pmid):
 
     handle = Entrez.efetch(db="pubmed", id=pmid, rettype='xml')
     record = Entrez.read(handle)
+    if 'PubmedArticle' not in record:
+        return None
+    if len(record['PubmedArticle']) < 1:
+        return None
     paper = record['PubmedArticle'][0]
     entry = {}
     entry['pmid'] = int(paper['MedlineCitation']['PMID'])
