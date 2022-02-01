@@ -10803,6 +10803,7 @@ class Complexdbentity(Dbentity):
                 type = "protein"
             elif interactor.format_name.startswith('CPX-'):
                 type = 'subcomplex'
+                link = '/complex/' + interactor.format_name
             elif interactor.format_name.startswith('CHEBI:'):
                 type = "small molecule"
 
@@ -10868,6 +10869,7 @@ class Complexdbentity(Dbentity):
                 type = "protein"
             elif interactor.format_name.startswith('CPX-'):
                 type = 'subcomplex'
+                link = '/complex/' + interactor.format_name
             elif interactor.format_name.startswith('CHEBI:'):
                 type = "small molecule"
             subunits.append({ "display_name": display_name,
