@@ -4,8 +4,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
         apache2 \
-        redis-server \
-	make \
+        make \
+	postfix \
         python3-pip \
     && pip3 install virtualenv 
 
