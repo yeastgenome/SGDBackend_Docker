@@ -1,3 +1,11 @@
+FROM ubuntu:20.04 as builder
+
+RUN mkdir /data
+        
+WORKDIR /data
+
+RUN git clone https://github.com/yeastgenome/SGDBackend_docker.git
+
 FROM ubuntu:20.04
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
@@ -9,17 +17,18 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         python3-pip \
     && pip3 install virtualenv 
 
-RUN mkdir /data
-    && cd /data \
-    && mkdir www \
-    && cd /data/www \
+WORKDIR /data
+RUN mkdir www \
+    && cd www \
     && mkdir logs
 
 WORKDIR /data/www
-COPY www .
+COPY --from=builder /data/SGDBackend_docker/www .
+
 RUN virtualenv venv && . venv/bin/activate
 
 WORKDIR /data/www/SGDBackend
+COPY prod_variables.sh .
 RUN make build \ 
     && python scripts/disambiguation/index_disambiguation.py \
     && . prod_variables.sh \
