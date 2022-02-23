@@ -15,6 +15,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         make \
 	postfix \
         python3-pip \
+	npm \
     && pip3 install virtualenv 
 
 WORKDIR /data
@@ -29,7 +30,8 @@ RUN virtualenv venv && . venv/bin/activate
 
 WORKDIR /data/www/SGDBackend
 COPY prod_variables.sh .
-RUN make build \ 
+RUN pip3 install -U setuptools==57.5.0 \
+    && make build \ 
     && python scripts/disambiguation/index_disambiguation.py \
     && . prod_variables.sh \
     && pserve development.ini --reload > /data/www/logs/error.log 2>&1 &
